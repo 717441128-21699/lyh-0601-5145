@@ -555,17 +555,17 @@ const Reports = () => {
                   {hasPermission('report:export') && (
                     <>
                       <Button icon={<FileExcelOutlined />} disabled={!detail.files?.excel}
-                        onClick={() => handleDownload(api.reports.downloadExcel(detail._id), `report_${detail._id}.xlsx`)}>
+                        onClick={() => handleDownload(api.reports.downloadExcel(detail.reportId), `report_${detail.reportId}.xlsx`)}>
                         下载 Excel
                       </Button>
                       <Button icon={<FilePdfOutlined />} disabled={!detail.files?.pdf}
-                        onClick={() => handleDownload(api.reports.downloadPdf(detail._id), `report_${detail._id}.pdf`)}>
+                        onClick={() => handleDownload(api.reports.downloadPdf(detail.reportId), `report_${detail.reportId}.pdf`)}>
                         下载 PDF
                       </Button>
                     </>
                   )}
                   {hasPermission('report:create') && (
-                    <Button icon={<ReloadOutlined />} onClick={() => regenerateFiles(detail._id)}>
+                    <Button icon={<ReloadOutlined />} onClick={() => regenerateFiles(detail.reportId)}>
                       重新生成文件
                     </Button>
                   )}

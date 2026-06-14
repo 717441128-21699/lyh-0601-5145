@@ -296,7 +296,7 @@ router.get('/summary/today', requirePermission('report:view'), asyncHandler(asyn
 
 router.post('/:reportId/regenerate-files', requirePermission('report:generate'), asyncHandler(async (req, res) => {
   const { reportId } = req.params;
-  const report = await ComplianceReport.findOne({ reportId });
+  const report = await findReportById(reportId);
   if (!report) throw new NotFoundError('报告不存在');
 
   const [excelPath, pdfPath] = await Promise.all([

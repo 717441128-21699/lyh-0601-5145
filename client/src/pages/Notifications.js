@@ -138,6 +138,8 @@ const Notifications = () => {
 
   useEffect(() => { fetchData(); }, [page, pageSize, activeTab]);
 
+  const handleSearch = () => { setPage(1); fetchData(); };
+
   const openDetail = async (id, markAsRead = true) => {
     setDetailOpen(true);
     try {
