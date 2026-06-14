@@ -60,7 +60,21 @@ router.get('/stats/summary', requirePermission('supplier:view'), asyncHandler(as
     ]),
     Supplier.aggregate([
       { $match: { isActive: true } },
-      { $group: { _id: '$country', count: { $sum: 1 }, highRisk: { $sum: { $cond: [{ $in: ['$riskLevel', ['HIGH', 'CRITICAL', 'BLACKLISTED']] }, 1, 0] } } },
+      {
+        $group: {
+          _id: '$country',
+          count: { $sum: 1 },
+          highRisk: {
+            $sum: {
+              $cond: [
+                { $in: ['$riskLevel', ['HIGH', 'CRITICAL', 'BLACKLISTED']] },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      },
       { $sort: { count: -1 } },
       { $limit: 20 },
     ]),

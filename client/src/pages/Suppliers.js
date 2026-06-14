@@ -6,9 +6,10 @@ import {
 } from 'antd';
 import {
   SearchOutlined, FilterOutlined, ReloadOutlined, EyeOutlined,
-  BanOutlined, SafetyOutlined, UnlockOutlined, WarningOutlined,
+  SafetyOutlined, UnlockOutlined, WarningOutlined,
   UserOutlined, FlagOutlined, BankOutlined, TeamOutlined, RiseOutlined,
   CloseCircleOutlined, SwapOutlined, SyncOutlined, HistoryOutlined,
+  BlockOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -68,7 +69,7 @@ export default function Suppliers() {
   const doBlacklist = (s) => {
     modal.confirm({
       title: `确认将 ${s.name} 加入黑名单？`,
-      icon: <BanOutlined style={{ color: '#ff4d4f' }} />,
+      icon: <BlockOutlined style={{ color: '#ff4d4f' }} />,
       okText: '确认拉黑',
       okButtonProps: { danger: true },
       content: (
@@ -204,7 +205,7 @@ export default function Suppliers() {
           </Tooltip>
           {r.blacklisted
             ? <Button size="small" type="link" icon={<UnlockOutlined />} style={{ color: '#52c41a' }} onClick={() => doUnblock(r)}>解除</Button>
-            : <Button size="small" type="link" danger icon={<BanOutlined />} onClick={() => doBlacklist(r)}>拉黑</Button>
+            : <Button size="small" type="link" danger icon={<BlockOutlined />} onClick={() => doBlacklist(r)}>拉黑</Button>
           }
         </Space>
       ),
@@ -213,7 +214,7 @@ export default function Suppliers() {
 
   const supplierStats = [
     { title: '供应商总数', value: stats.total, color: '#1677ff', icon: <BankOutlined /> },
-    { title: '黑名单', value: stats.blacklisted, color: '#ff4d4f', icon: <BanOutlined /> },
+    { title: '黑名单', value: stats.blacklisted, color: '#ff4d4f', icon: <BlockOutlined /> },
     {
       title: '高风险', value: (stats.byRisk || []).reduce((s, r) =>
         s + (['HIGH', 'CRITICAL', 'BLACKLISTED'].includes(r._id) ? r.count : 0), 0),
@@ -395,7 +396,7 @@ export default function Suppliers() {
               }}>重新筛查</Button>
               {detail.supplier.blacklisted
                 ? <Button type="primary" icon={<UnlockOutlined />} style={{ background: '#52c41a', borderColor: '#52c41a' }} onClick={() => doUnblock(detail.supplier)}>解除黑名单</Button>
-                : <Button danger icon={<BanOutlined />} onClick={() => doBlacklist(detail.supplier)}>加入黑名单</Button>
+                : <Button danger icon={<BlockOutlined />} onClick={() => doBlacklist(detail.supplier)}>加入黑名单</Button>
               }
             </Space>
           )

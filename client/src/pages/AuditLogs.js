@@ -11,7 +11,7 @@ import {
   ClockCircleOutlined, DatabaseOutlined, SettingOutlined,
   LockOutlined, UnlockOutlined, TeamOutlined, FileProtectOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+
 import { api } from '../services/api';
 import { useUserStore, formatNumber } from '../store';
 import ReactECharts from 'echarts-for-react';
@@ -37,7 +37,7 @@ const SEVERITY_LABELS = {
   CRITICAL: '严重',
 };
 
-const CATEGORY_ICONS: Record<string, any> = {
+const CATEGORY_ICONS = {
   AUTH: <LockOutlined />,
   USER: <TeamOutlined />,
   TRANSACTION: <DatabaseOutlined />,
@@ -52,7 +52,7 @@ const CATEGORY_ICONS: Record<string, any> = {
   SYSTEM: <SettingOutlined />,
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORY_LABELS = {
   AUTH: '认证登录',
   USER: '用户管理',
   TRANSACTION: '交易筛查',
@@ -67,44 +67,29 @@ const CATEGORY_LABELS: Record<string, string> = {
   SYSTEM: '系统事件',
 };
 
-interface AuditRecord {
-  _id: string;
-  category: string;
-  action: string;
-  severity: string;
-  user: { name: string; username: string; role: string };
-  ip: string;
-  userAgent: string;
-  resourceType: string;
-  resourceId: string;
-  description: string;
-  details: any;
-  beforeSnapshot: any;
-  afterSnapshot: any;
-  createdAt: string;
-}
 
-const AuditLogs: React.FC = () => {
+
+const AuditLogs = () => {
   const hasPermission = useUserStore((s) => s.hasPermission);
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<AuditRecord[]>([]);
+  const [data, setData] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [filters, setFilters] = useState<any>({
+  const [filters, setFilters] = useState({
     category: undefined, severity: undefined, action: undefined,
     userId: undefined, dateRange: undefined, keyword: undefined,
   });
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detail, setDetail] = useState<AuditRecord | null>(null);
-  const [summary, setSummary] = useState<any>(null);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [detail, setDetail] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [exporting, setExporting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: any = { page, pageSize };
+      const params = { page, pageSize };
       if (filters.category) params.category = filters.category;
       if (filters.severity) params.severity = filters.severity;
       if (filters.action) params.action = filters.action;
@@ -114,7 +99,7 @@ const AuditLogs: React.FC = () => {
         params.startDate = filters.dateRange[0].startOf('day').toISOString();
         params.endDate = filters.dateRange[1].endOf('day').toISOString();
       }
-      const res: any = await api.audit.list(params);
+      const res = await api.audit.list(params);
       setData(res.logs || []);
       setTotal(res.total || 0);
     } catch (e) { console.error(e); }
@@ -123,7 +108,7 @@ const AuditLogs: React.FC = () => {
 
   const fetchSummary = async () => {
     try {
-      const params: any = {};
+      const params = {};
       if (filters.dateRange?.length === 2) {
         params.startDate = filters.dateRange[0].startOf('day').toISOString();
         params.endDate = filters.dateRange[1].endOf('day').toISOString();
@@ -133,7 +118,7 @@ const AuditLogs: React.FC = () => {
         api.audit.categories(),
       ]);
       setSummary(sumRes);
-      setCategories(catRes as any[]);
+      setCategories(catRes);
     } catch (e) { /* ignore */ }
   };
 
@@ -142,10 +127,10 @@ const AuditLogs: React.FC = () => {
 
   const handleSearch = () => { setPage(1); fetchData(); fetchSummary(); };
 
-  const openDetail = async (id: string) => {
+  const openDetail = async (id) => {
     setDetailOpen(true);
     try {
-      const res: any = await api.audit.get(id);
+      const res = await api.audit.get(id);
       setDetail(res);
     } catch (e) { message.error('加载日志详情失败'); }
   };
@@ -153,7 +138,7 @@ const AuditLogs: React.FC = () => {
   const handleExport = async () => {
     try {
       setExporting(true);
-      const payload: any = {};
+      const payload = {};
       if (filters.category) payload.category = filters.category;
       if (filters.severity) payload.severity = filters.severity;
       if (filters.dateRange?.length === 2) {
@@ -162,7 +147,7 @@ const AuditLogs: React.FC = () => {
       }
       if (filters.keyword) payload.keyword = filters.keyword;
 
-      const res: any = await api.audit.export(payload);
+      const res = await api.audit.export(payload);
       if (res.downloadUrl) {
         const token = localStorage.getItem('token');
         const a = document.createElement('a');
@@ -171,7 +156,7 @@ const AuditLogs: React.FC = () => {
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
       }
       message.success('导出任务已完成');
-    } catch (e: any) {
+    } catch (e) {
       message.error(e.response?.data?.error || '导出失败');
     } finally { setExporting(false); }
   };
@@ -206,7 +191,7 @@ const AuditLogs: React.FC = () => {
         type: 'pie', radius: ['45%', '70%'], center: ['50%', '45%'],
         itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
         label: { show: false },
-        data: Object.entries(summary.bySeverity || {}).map(([k, v]: any) => ({
+        data: Object.entries(summary.bySeverity || {}).map(([k, v]) => ({
           name: SEVERITY_LABELS[k] || k,
           value: v,
           itemStyle: { color: SEVERITY_COLORS[k] },
@@ -215,7 +200,7 @@ const AuditLogs: React.FC = () => {
     };
   }, [summary]);
 
-  const columns: ColumnsType<AuditRecord> = [
+  const columns: Array = [
     {
       title: '时间', dataIndex: 'createdAt', width: 170, fixed: 'left',
       render: (v) => (
@@ -364,7 +349,7 @@ const AuditLogs: React.FC = () => {
               allowClear style={{ width: '100%' }} placeholder="全部分类"
               showSearch optionFilterProp="children"
               value={filters.category}
-              onChange={(v) => setFilters((f: any) => ({ ...f, category: v }))}
+              onChange={(v) => setFilters((f) => ({ ...f, category: v }))}
             >
               {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
                 <Option key={k} value={k}>{v}</Option>
@@ -376,7 +361,7 @@ const AuditLogs: React.FC = () => {
             <Select
               allowClear style={{ width: '100%' }} placeholder="全部级别"
               value={filters.severity}
-              onChange={(v) => setFilters((f: any) => ({ ...f, severity: v }))}
+              onChange={(v) => setFilters((f) => ({ ...f, severity: v }))}
             >
               {Object.entries(SEVERITY_LABELS).map(([k, v]) => (
                 <Option key={k} value={k}>{v}</Option>
@@ -388,14 +373,14 @@ const AuditLogs: React.FC = () => {
             <Input
               allowClear placeholder="如: LOGIN, CREATE..."
               value={filters.action}
-              onChange={(e) => setFilters((f: any) => ({ ...f, action: e.target.value }))}
+              onChange={(e) => setFilters((f) => ({ ...f, action: e.target.value }))}
             />
           </Col>
           <Col xs={24} sm={12} md={8}>
             <label className="block text-sm text-gray-600 mb-1">时间范围</label>
             <RangePicker showTime style={{ width: '100%' }}
               value={filters.dateRange}
-              onChange={(v) => setFilters((f: any) => ({ ...f, dateRange: v }))} />
+              onChange={(v) => setFilters((f) => ({ ...f, dateRange: v }))} />
           </Col>
           <Col xs={24} md={6}>
             <label className="block text-sm text-gray-600 mb-1">关键词搜索</label>
@@ -403,7 +388,7 @@ const AuditLogs: React.FC = () => {
               allowClear placeholder="描述/资源ID/用户名..."
               prefix={<SearchOutlined className="text-gray-400" />}
               value={filters.keyword}
-              onChange={(e) => setFilters((f: any) => ({ ...f, keyword: e.target.value }))}
+              onChange={(e) => setFilters((f) => ({ ...f, keyword: e.target.value }))}
               onPressEnter={handleSearch}
             />
           </Col>

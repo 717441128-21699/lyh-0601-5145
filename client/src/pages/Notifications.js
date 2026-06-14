@@ -12,7 +12,7 @@ import {
   CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
   DeleteOutlined, ReadOutlined, SearchOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+
 import { api } from '../services/api';
 import { useUserStore, useNotificationStore, formatNumber } from '../store';
 import ReactECharts from 'echarts-for-react';
@@ -37,7 +37,7 @@ const PRIORITY_LABELS = {
   CRITICAL: '极紧急',
 };
 
-const PRIORITY_ICONS: Record<string, any> = {
+const PRIORITY_ICONS = {
   LOW: <InfoCircleOutlined />,
   MEDIUM: <BellOutlined />,
   HIGH: <ExclamationCircleOutlined />,
@@ -45,7 +45,7 @@ const PRIORITY_ICONS: Record<string, any> = {
   CRITICAL: <ThunderboltOutlined />,
 };
 
-const TYPE_LABELS: Record<string, string> = {
+const TYPE_LABELS = {
   HIGH_RISK_ALERT: '高风险告警',
   REVIEW_TICKET_CREATED: '工单创建',
   REVIEW_TICKET_ASSIGNED: '工单分配',
@@ -59,7 +59,7 @@ const TYPE_LABELS: Record<string, string> = {
   SUPPLIER_BLACKLISTED: '供应商拉黑',
 };
 
-const TYPE_ICONS: Record<string, any> = {
+const TYPE_ICONS = {
   HIGH_RISK_ALERT: <SafetyOutlined />,
   REVIEW_TICKET_CREATED: <FileProtectOutlined />,
   REVIEW_TICKET_ASSIGNED: <TeamOutlined />,
@@ -80,7 +80,7 @@ const CHANNEL_LABELS = {
   SMS: '短信',
 };
 
-const CHANNEL_STATUS_LABELS: Record<string, string> = {
+const CHANNEL_STATUS_LABELS = {
   PENDING: '待发送',
   SENT: '已发送',
   FAILED: '发送失败',
@@ -94,57 +94,41 @@ const CHANNEL_STATUS_COLORS = {
   READ: 'green',
 };
 
-interface NotifyRecord {
-  _id: string;
-  type: string;
-  priority: string;
-  title: string;
-  content: string;
-  summary: string;
-  user: { name: string; username: string };
-  resourceType: string;
-  resourceId: string;
-  channels: Array<{ channel: string; status: string; sentAt?: string; error?: string }>;
-  read: boolean;
-  readAt?: string;
-  archived: boolean;
-  metadata: any;
-  createdAt: string;
-}
 
-const Notifications: React.FC = () => {
+
+const Notifications = () => {
   const hasPermission = useUserStore((s) => s.hasPermission);
   const fetchUnread = useNotificationStore((s) => s.fetchUnread);
   const setUnread = useNotificationStore((s) => s.setUnread);
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<NotifyRecord[]>([]);
+  const [data, setData] = useState([]);
   const [total, setTotal] = useState(0);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [activeTab, setActiveTab] = useState('all');
-  const [filters, setFilters] = useState<any>({
+  const [filters, setFilters] = useState({
     type: undefined, priority: undefined, onlyUnread: false,
   });
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detail, setDetail] = useState<NotifyRecord | null>(null);
+  const [detail, setDetail] = useState(null);
   const [webhookOpen, setWebhookOpen] = useState(false);
   const [webhookForm] = Form.useForm();
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [typeConfig, setTypeConfig] = useState<any>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [typeConfig, setTypeConfig] = useState(null);
   const [markLoading, setMarkLoading] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: any = { page, pageSize };
+      const params = { page, pageSize };
       if (filters.type) params.type = filters.type;
       if (filters.priority) params.priority = filters.priority;
       if (filters.onlyUnread) params.read = false;
       if (activeTab === 'unread') params.read = false;
       if (activeTab === 'urgent') params.minPriority = 'HIGH';
 
-      const res: any = await api.notifications.list(params);
+      const res = await api.notifications.list(params);
       setData(res.notifications || []);
       setTotal(res.total || 0);
       setUnreadTotal(res.unread || 0);
@@ -154,10 +138,10 @@ const Notifications: React.FC = () => {
 
   useEffect(() => { fetchData(); }, [page, pageSize, activeTab]);
 
-  const openDetail = async (id: string, markAsRead = true) => {
+  const openDetail = async (id, markAsRead = true) => {
     setDetailOpen(true);
     try {
-      const res: any = await api.notifications.get(id);
+      const res = await api.notifications.get(id);
       setDetail(res);
       if (markAsRead && !res.read) {
         await api.notifications.markRead({ ids: [id] });
@@ -175,7 +159,7 @@ const Notifications: React.FC = () => {
       setUnreadTotal(0);
       setUnread(0, 0);
       fetchData();
-    } catch (e: any) {
+    } catch (e) {
       message.error(e.response?.data?.error || '操作失败');
     } finally { setMarkLoading(false); }
   };
@@ -184,12 +168,12 @@ const Notifications: React.FC = () => {
     if (!selectedRowKeys.length) return;
     try {
       setMarkLoading(true);
-      await api.notifications.markRead({ ids: selectedRowKeys as string[] });
+      await api.notifications.markRead({ ids: selectedRowKeys });
       message.success(`已标记 ${selectedRowKeys.length} 条为已读`);
       setSelectedRowKeys([]);
       fetchData();
       fetchUnread(api);
-    } catch (e: any) {
+    } catch (e) {
       message.error(e.response?.data?.error || '操作失败');
     } finally { setMarkLoading(false); }
   };
@@ -197,16 +181,16 @@ const Notifications: React.FC = () => {
   const archiveSelected = async () => {
     if (!selectedRowKeys.length) return;
     try {
-      await Promise.all((selectedRowKeys as string[]).map((id) => api.notifications.archive(id)));
+      await Promise.all(selectedRowKeys.map((id) => api.notifications.archive(id)));
       message.success(`已归档 ${selectedRowKeys.length} 条通知`);
       setSelectedRowKeys([]);
       fetchData();
     } catch (e) { message.error('归档失败'); }
   };
 
-  const testWebhook = async (values: any) => {
+  const testWebhook = async (values) => {
     try {
-      const res: any = await api.notifications.testWebhook(values);
+      const res = await api.notifications.testWebhook(values);
       if (res.success) {
         message.success('Webhook 测试消息发送成功');
         setWebhookOpen(false);
@@ -214,14 +198,14 @@ const Notifications: React.FC = () => {
       } else {
         message.error(res.error || '发送失败');
       }
-    } catch (e: any) {
+    } catch (e) {
       message.error(e.response?.data?.error || '发送失败');
     }
   };
 
   const fetchTypeConfig = async () => {
     try {
-      const res: any = await api.notifications.types();
+      const res = await api.notifications.types();
       setTypeConfig(res);
     } catch (e) { /* ignore */ }
   };
@@ -239,7 +223,7 @@ const Notifications: React.FC = () => {
         itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
         label: { show: false },
         emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold' } },
-        data: Object.entries(stats).map(([k, v]: any) => ({
+        data: Object.entries(stats).map(([k, v]) => ({
           name: TYPE_LABELS[k] || k,
           value: v,
         })),
@@ -247,7 +231,7 @@ const Notifications: React.FC = () => {
     };
   }, [typeConfig]);
 
-  const columns: ColumnsType<NotifyRecord> = [
+  const columns: Array = [
     {
       title: '优先级', dataIndex: 'priority', width: 90, align: 'center',
       render: (v) => {
@@ -291,7 +275,7 @@ const Notifications: React.FC = () => {
       title: '送达状态', dataIndex: 'channels', width: 160,
       render: (channels) => (
         <Space size={[4, 4]} wrap>
-          {channels?.map((c: any) => (
+          {channels?.map((c) => (
             <Tooltip key={c.channel} title={`${CHANNEL_LABELS[c.channel]}: ${CHANNEL_STATUS_LABELS[c.status]}${c.error ? `\n错误: ${c.error}` : ''}`}>
               <Tag
                 color={c.status === 'FAILED' ? 'red' : c.status === 'READ' ? 'green' : c.status === 'SENT' ? 'blue' : 'default'}
@@ -438,7 +422,7 @@ const Notifications: React.FC = () => {
                     allowClear style={{ width: '100%' }} placeholder="全部类型"
                     showSearch optionFilterProp="children"
                     value={filters.type}
-                    onChange={(v) => setFilters((f: any) => ({ ...f, type: v }))}
+                    onChange={(v) => setFilters((f) => ({ ...f, type: v }))}
                   >
                     {Object.entries(TYPE_LABELS).map(([k, v]) => (
                       <Option key={k} value={k}>{v}</Option>
@@ -450,7 +434,7 @@ const Notifications: React.FC = () => {
                   <Select
                     allowClear style={{ width: '100%' }} placeholder="全部优先级"
                     value={filters.priority}
-                    onChange={(v) => setFilters((f: any) => ({ ...f, priority: v }))}
+                    onChange={(v) => setFilters((f) => ({ ...f, priority: v }))}
                   >
                     {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
                       <Option key={k} value={k}>{v}</Option>
@@ -462,7 +446,7 @@ const Notifications: React.FC = () => {
                   <div className="flex items-center gap-4 h-8">
                     <Checkbox
                       checked={filters.onlyUnread}
-                      onChange={(e) => setFilters((f: any) => ({ ...f, onlyUnread: e.target.checked }))}
+                      onChange={(e) => setFilters((f) => ({ ...f, onlyUnread: e.target.checked }))}
                     >
                       仅显示未读
                     </Checkbox>
@@ -580,7 +564,7 @@ const Notifications: React.FC = () => {
               <List
                 size="small"
                 dataSource={detail.channels || []}
-                renderItem={(c: any) => (
+                renderItem={(c) => (
                   <List.Item>
                     <Row className="w-full" align="middle" gutter={[8, 0]}>
                       <Col span={6}>

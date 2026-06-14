@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Button, Spin, message, Result, Descriptions, Row, Col, Tag, Progress, Divider, List, Space, Tooltip, Timeline, Modal, Form, Input, Select, Avatar, Statistic, Alert } from 'antd';
+import { Card, Button, Spin, message, Result, Descriptions, Row, Col, Tag, Progress, Divider, List, Space, Tooltip, Timeline, Modal, Form, Input, Select, Avatar, Statistic, Alert, Empty, Checkbox } from 'antd';
 import { ArrowLeftOutlined, UserOutlined, TeamOutlined, FileSearchOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, ThunderboltOutlined, SafetyOutlined, SendOutlined, ExclamationCircleOutlined, ReloadOutlined, WarningOutlined, RiseOutlined } from '@ant-design/icons';
 import { api } from '../services/api';
 import { RISK_COLORS, RISK_LABELS, REVIEW_STATUS_LABELS, REVIEW_STATUS_COLORS, formatCurrency, formatNumber, formatPercent, useUserStore } from '../store';
@@ -9,13 +9,13 @@ import dayjs from 'dayjs';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const ReviewDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+const ReviewDetail = () => {
+  const { id } = useParams();
   const navigate = useNavigate();
   const hasPermission = useUserStore((s) => s.hasPermission);
   const user = useUserStore((s) => s.user);
   const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -26,7 +26,7 @@ const ReviewDetail: React.FC = () => {
   const [rejectForm] = Form.useForm();
   const [escalateForm] = Form.useForm();
   const [assignForm] = Form.useForm();
-  const [officers, setOfficers] = useState<any[]>([]);
+  const [officers, setOfficers] = useState([]);
 
   const fetchData = async () => {
     if (!id) return;
@@ -37,8 +37,8 @@ const ReviewDetail: React.FC = () => {
         api.reviews.workload().catch(() => ({ officers: [] })),
       ]);
       setDetail(d);
-      setOfficers((workload as any).officers || []);
-    } catch (e: any) {
+      setOfficers((workload).officers || []);
+    } catch (e) {
       if (e.response?.status === 404) setNotFound(true);
       else message.error('加载工单详情失败');
     } finally { setLoading(false); }
@@ -52,49 +52,49 @@ const ReviewDetail: React.FC = () => {
     : 0;
   const totalSLA = detail?.riskLevel === 'CRITICAL' ? 4 : 24;
 
-  const doApprove = async (values: any) => {
+  const doApprove = async (values) => {
     try {
       setActionLoading(true);
       await api.reviews.approve(id, values.notes);
       message.success('审查通过，交易已放行');
       setApproveOpen(false); approveForm.resetFields();
       setTimeout(fetchData, 800);
-    } catch (e: any) { message.error(e.response?.data?.error || '操作失败'); }
+    } catch (e) { message.error(e.response?.data?.error || '操作失败'); }
     finally { setActionLoading(false); }
   };
 
-  const doReject = async (values: any) => {
+  const doReject = async (values) => {
     try {
       setActionLoading(true);
-      const payload: any = { reason: values.reason, notes: values.notes };
+      const payload = { reason: values.reason, notes: values.notes };
       if (values.blacklistSupplier) payload.blacklistSupplier = true;
       await api.reviews.reject(id, payload);
       message.success('审查已拒绝，交易已拦截');
       setRejectOpen(false); rejectForm.resetFields();
       setTimeout(fetchData, 800);
-    } catch (e: any) { message.error(e.response?.data?.error || '操作失败'); }
+    } catch (e) { message.error(e.response?.data?.error || '操作失败'); }
     finally { setActionLoading(false); }
   };
 
-  const doEscalate = async (values: any) => {
+  const doEscalate = async (values) => {
     try {
       setActionLoading(true);
       await api.reviews.escalate(id, values.reason);
       message.success('已升级至合规总监');
       setEscalateOpen(false); escalateForm.resetFields();
       setTimeout(fetchData, 800);
-    } catch (e: any) { message.error(e.response?.data?.error || '操作失败'); }
+    } catch (e) { message.error(e.response?.data?.error || '操作失败'); }
     finally { setActionLoading(false); }
   };
 
-  const doAssign = async (values: any) => {
+  const doAssign = async (values) => {
     try {
       setActionLoading(true);
       await api.reviews.assign(id, values.assignTo);
       message.success('工单已分配');
       setAssignOpen(false); assignForm.resetFields();
       setTimeout(fetchData, 800);
-    } catch (e: any) { message.error(e.response?.data?.error || '操作失败'); }
+    } catch (e) { message.error(e.response?.data?.error || '操作失败'); }
     finally { setActionLoading(false); }
   };
 
@@ -240,7 +240,7 @@ const ReviewDetail: React.FC = () => {
               description={
                 <div className="space-y-1">
                   <div>关联交易: {detail.transaction?.transactionId} · {formatCurrency(detail.transaction?.amount, detail.transaction?.currency)}</div>
-                  <div>风险因子: {detail.riskFactors?.map((f: any) => `${f.name}(${f.weight}分)`).join('、') || '无'}</div>
+                  <div>风险因子: {detail.riskFactors?.map((f) => `${f.name}(${f.weight}分)`).join('、') || '无'}</div>
                   {detail.sanctionMatches?.length > 0 && (
                     <div className="font-semibold">制裁命中: <Tag color="red">{detail.sanctionMatches.length} 条</Tag></div>
                   )}
@@ -312,7 +312,7 @@ const ReviewDetail: React.FC = () => {
               {detail.sanctionMatches?.length ? (
                 <List
                   dataSource={detail.sanctionMatches}
-                  renderItem={(m: any) => (
+                  renderItem={(m) => (
                     <List.Item className="!px-0">
                       <Card size="small" className="w-full !rounded-lg border-l-4 !border-l-red-500">
                         <Row gutter={[12, 8]} align="middle">
@@ -395,7 +395,7 @@ const ReviewDetail: React.FC = () => {
                       </div>
                     ),
                   },
-                ].filter(Boolean) as any}
+                ].filter(Boolean)}
               />
             </Card>
 
@@ -405,7 +405,7 @@ const ReviewDetail: React.FC = () => {
                 <List
                   size="small"
                   dataSource={detail.auditLogs}
-                  renderItem={(log: any) => (
+                  renderItem={(log) => (
                     <List.Item className="!px-0">
                       <Row className="w-full" align="middle" gutter={[8, 0]}>
                         <Col span={6} className="text-xs font-mono text-gray-500">{dayjs(log.createdAt).format('MM-DD HH:mm:ss')}</Col>
@@ -499,7 +499,7 @@ const ReviewDetail: React.FC = () => {
         <Form form={assignForm} layout="vertical" onFinish={doAssign}>
           <Form.Item name="assignTo" label="选择审查员" rules={[{ required: true, message: '请选择审查员' }]}>
             <Select placeholder="请选择要分配的审查员" showSearch optionFilterProp="label">
-              {officers.length ? officers.map((o: any) => (
+              {officers.length ? officers.map((o) => (
                 <Option key={o._id} value={o._id} label={`${o.name} (${o.role})`}>
                   <Row align="middle" gutter={[8, 0]}>
                     <Col><Avatar size="small" icon={<UserOutlined />} /></Col>

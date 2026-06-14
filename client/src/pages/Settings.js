@@ -18,7 +18,7 @@ import dayjs from 'dayjs';
 
 const { Password } = Input;
 
-const ROLE_LABELS: Record<string, string> = {
+const ROLE_LABELS = {
   ADMIN: '系统管理员',
   COMPLIANCE_DIRECTOR: '合规总监',
   COMPLIANCE_OFFICER: '合规专员',
@@ -27,7 +27,7 @@ const ROLE_LABELS: Record<string, string> = {
   VIEWER: '只读用户',
 };
 
-const ROLE_COLORS: Record<string, string> = {
+const ROLE_COLORS = {
   ADMIN: 'red',
   COMPLIANCE_DIRECTOR: 'purple',
   COMPLIANCE_OFFICER: 'blue',
@@ -36,13 +36,13 @@ const ROLE_COLORS: Record<string, string> = {
   VIEWER: 'default',
 };
 
-const Settings: React.FC = () => {
+const Settings = () => {
   const { user, setUser, permissions } = useUserStore();
   const [passwordForm] = Form.useForm();
   const [profileForm] = Form.useForm();
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [notifSettings, setNotifSettings] = useState<any>({
+  const [notifSettings, setNotifSettings] = useState({
     HIGH_RISK_ALERT: { inApp: true, email: true, webhook: true, sms: false },
     REVIEW_TICKET_CREATED: { inApp: true, email: false, webhook: false, sms: false },
     REVIEW_TICKET_ASSIGNED: { inApp: true, email: true, webhook: false, sms: false },
@@ -74,7 +74,7 @@ const Settings: React.FC = () => {
     }
   }, [user]);
 
-  const handleChangePassword = async (values: any) => {
+  const handleChangePassword = async (values) => {
     if (values.newPassword !== values.confirmPassword) {
       message.error('两次输入的新密码不一致');
       return;
@@ -87,29 +87,29 @@ const Settings: React.FC = () => {
       });
       message.success('密码修改成功，请妥善保管新密码');
       passwordForm.resetFields();
-    } catch (e: any) {
+    } catch (e) {
       message.error(e.response?.data?.error || '密码修改失败');
     } finally {
       setPasswordLoading(false);
     }
   };
 
-  const handleUpdateProfile = async (values: any) => {
+  const handleUpdateProfile = async (values) => {
     try {
       setProfileLoading(true);
-      const res: any = await api.auth.me();
+      const res = await api.auth.me();
       const merged = { ...res, ...values };
       setUser(merged);
       message.success('个人信息已更新');
-    } catch (e: any) {
+    } catch (e) {
       message.error(e.response?.data?.error || '更新失败');
     } finally {
       setProfileLoading(false);
     }
   };
 
-  const toggleNotif = (type: string, channel: string, checked: boolean) => {
-    setNotifSettings((prev: any) => ({
+  const toggleNotif = (type, channel, checked) => {
+    setNotifSettings((prev) => ({
       ...prev,
       [type]: {
         ...prev[type],
@@ -122,7 +122,7 @@ const Settings: React.FC = () => {
     message.success('通知偏好设置已保存');
   };
 
-  const NotifRow = ({ typeKey, label, icon, desc }: any) => (
+  const NotifRow = ({ typeKey, label, icon, desc }) => (
     <Row className="py-3 border-b border-gray-100 last:border-b-0" align="middle" gutter={[8, 0]}>
       <Col xs={24} md={8}>
         <Space>
@@ -530,7 +530,6 @@ const Settings: React.FC = () => {
                   typeKey="SUPPLIER_BLACKLISTED" label="供应商拉黑" icon={<UserOutlined className="text-red-600" />}
                   desc="供应商被加入黑名单/解除"
                 />
-              </div>
             </Card>
           </div>
 
@@ -551,7 +550,7 @@ const Settings: React.FC = () => {
                       { t: '异常登录检测', v: '已启用', ok: true },
                       { t: '会话超时', v: '2小时无操作自动登出', ok: true },
                     ]}
-                    renderItem={(item: any) => (
+                    renderItem={(item) => (
                       <List.Item className="!px-0">
                         <Row className="w-full" align="middle">
                           <Col flex="auto">{item.t}</Col>
@@ -601,7 +600,7 @@ const Settings: React.FC = () => {
                       { t: dayjs().subtract(2, 'day').subtract(5, 'hour').format('YYYY-MM-DD HH:mm:ss'), ip: '10.0.0.25', loc: '公司内网', ok: true },
                       { t: dayjs().subtract(3, 'day').format('YYYY-MM-DD HH:mm:ss'), ip: '192.168.1.100', loc: '上海市 电信', ok: true },
                     ]}
-                    renderItem={(item: any) => (
+                    renderItem={(item) => (
                       <List.Item>
                         <Row className="w-full" align="middle">
                           <Col xs={24} sm={8}>

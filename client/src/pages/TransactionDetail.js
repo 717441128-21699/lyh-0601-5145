@@ -6,13 +6,13 @@ import { api } from '../services/api';
 import { RISK_COLORS, RISK_LABELS, TRANSACTION_STATUS_LABELS, TRANSACTION_STATUS_COLORS, formatCurrency, formatNumber, formatPercent, useUserStore } from '../store';
 import dayjs from 'dayjs';
 
-const TransactionDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+const TransactionDetail = () => {
+  const { id } = useParams();
   const navigate = useNavigate();
   const hasPermission = useUserStore((s) => s.hasPermission);
   const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
+  const [detail, setDetail] = useState(null);
+  const [history, setHistory] = useState([]);
   const [notFound, setNotFound] = useState(false);
 
   const fetchData = async () => {
@@ -22,7 +22,7 @@ const TransactionDetail: React.FC = () => {
       const [d, h] = await Promise.all([api.transactions.get(id), api.transactions.history(id)]);
       setDetail(d);
       setHistory(h.logs || []);
-    } catch (e: any) {
+    } catch (e) {
       if (e.response?.status === 404) {
         setNotFound(true);
       } else {
@@ -127,7 +127,7 @@ const TransactionDetail: React.FC = () => {
               <Col xs={24} md={16}>
                 <Card className="!rounded-xl shadow-sm h-full" size="small" title={<Space><ThunderboltOutlined className="text-orange-500" />风险因子分析</Space>}>
                   <div className="space-y-2">
-                    {detail?.riskFactors?.length ? detail.riskFactors.map((f: any, i: number) => (
+                    {detail?.riskFactors?.length ? detail.riskFactors.map((f, i) => (
                       <Row key={i} align="middle" className="py-1.5 border-b border-gray-100 last:border-0">
                         <Col span={10} className="text-sm font-medium">{f.name}</Col>
                         <Col span={6} className="text-center">
@@ -204,7 +204,7 @@ const TransactionDetail: React.FC = () => {
               {detail.sanctionMatches?.length ? (
                 <List
                   dataSource={detail.sanctionMatches}
-                  renderItem={(m: any) => (
+                  renderItem={(m) => (
                     <List.Item className="!px-0">
                       <Card size="small" className="w-full !rounded-lg border-l-4 !border-l-red-500">
                         <Row gutter={[12, 8]} align="middle">
@@ -275,7 +275,7 @@ const TransactionDetail: React.FC = () => {
               {history.length ? (
                 <Timeline
                   mode="left"
-                  items={history.map((h: any) => ({
+                  items={history.map((h) => ({
                     color: h.severity === 'ERROR' ? 'red' : h.severity === 'WARNING' ? 'orange' : h.severity === 'CRITICAL' ? '#8b0000' : 'blue',
                     label: <span className="text-xs text-gray-500 font-mono whitespace-nowrap">{dayjs(h.createdAt).format('YYYY-MM-DD HH:mm:ss')}</span>,
                     children: (

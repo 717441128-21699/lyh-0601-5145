@@ -7,16 +7,77 @@ const {
 const { getNotificationsForUser, markAsRead, sendWebhookAlert } = require('../services/notificationService');
 const Notification = require('../models/Notification');
 
+function formatNotificationForFrontend(notif, userId) {
+  const n = notif.toObject ? notif.toObject() : notif;
+  const isRead = n.isRead || (n.readBy || []).some(r => r.userId === userId);
+  const channels = [
+    {
+      channel: 'IN_APP',
+      status: isRead ? 'READ' : (n.deliveryStatus?.inApp?.shown ? 'SENT' : 'PENDING'),
+      sentAt: n.deliveryStatus?.inApp?.shownAt,
+    },
+    {
+      channel: 'EMAIL',
+      status: n.deliveryStatus?.email?.sent ? 'SENT' : (n.deliveryStatus?.email?.error ? 'FAILED' : 'PENDING'),
+      sentAt: n.deliveryStatus?.email?.sentAt,
+      error: n.deliveryStatus?.email?.error,
+    },
+    {
+      channel: 'WEBHOOK',
+      status: n.deliveryStatus?.webhook?.sent ? 'SENT' : (n.deliveryStatus?.webhook?.error ? 'FAILED' : 'PENDING'),
+      sentAt: n.deliveryStatus?.webhook?.sentAt,
+      error: n.deliveryStatus?.webhook?.error,
+    },
+    {
+      channel: 'SMS',
+      status: n.deliveryStatus?.push?.sent ? 'SENT' : 'PENDING',
+      sentAt: n.deliveryStatus?.push?.sentAt,
+    },
+  ];
+
+  return {
+    _id: n._id,
+    id: n.notificationId,
+    notificationId: n.notificationId,
+    type: n.type,
+    priority: n.priority,
+    title: n.title,
+    content: n.message,
+    message: n.message,
+    summary: n.summary || n.message?.slice(0, 100),
+    user: n.recipients?.users?.length
+      ? { name: n.recipients.users[0], username: n.recipients.users[0] }
+      : undefined,
+    resourceType: n.relatedEntity?.type,
+    resourceId: n.relatedEntity?.id,
+    channels,
+    read: isRead,
+    isRead,
+    archived: n.isArchived,
+    isArchived: n.isArchived,
+    metadata: n.data || {},
+    data: n.data || {},
+    createdAt: n.timestamp,
+    timestamp: n.timestamp,
+    readAt: (n.readBy || []).find(r => r.userId === userId)?.readAt,
+  };
+}
+
 const router = express.Router();
 router.use(authenticateToken);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const { limit = 50, skip = 0, unreadOnly = false } = req.query;
-  const result = await getNotificationsForUser(req.user.userId, {
-    limit: parseInt(limit),
-    skip: parseInt(skip),
-    unreadOnly: unreadOnly === 'true' || unreadOnly === true,
-  });
+  const { limit = 50, skip = 0, page = 1, pageSize = 20, unreadOnly = false, read, minPriority, type, priority } = req.query;
+
+  const opts = {
+    limit: parseInt(pageSize) || parseInt(limit) || 20,
+    skip: ((parseInt(page) || 1) - 1) * (parseInt(pageSize) || parseInt(limit) || 20),
+    unreadOnly: unreadOnly === 'true' || unreadOnly === true || read === false,
+  };
+
+  const result = await getNotificationsForUser(req.user.userId, opts);
+
+  const notifications = (result.items || []).map(n => formatNotificationForFrontend(n, req.user.userId));
 
   const unreadCount = await Notification.countDocuments({
     $or: [{ 'recipients.users': req.user.userId }, { priority: { $in: ['HIGH', 'URGENT', 'CRITICAL'] } }],
@@ -24,14 +85,26 @@ router.get('/', asyncHandler(async (req, res) => {
     isArchived: false,
   });
 
+  const urgentCount = await Notification.countDocuments({
+    priority: { $in: ['URGENT', 'CRITICAL'] },
+    isRead: false,
+    isArchived: false,
+  });
+
   res.json({
-    ...result,
-    unreadCount,
+    notifications,
+    total: result.total,
+    unread: unreadCount,
+    unreadTotal: unreadCount,
+    urgentCount,
+    page: parseInt(page) || 1,
+    pageSize: parseInt(pageSize) || parseInt(limit) || 20,
   });
 }));
 
 router.post('/mark-read', asyncHandler(async (req, res) => {
-  const { notificationIds, all = false } = req.body;
+  const { notificationIds, ids, all = false } = req.body;
+  const targetIds = notificationIds || ids || [];
 
   if (all === true || all === 'true') {
     const result = await Notification.updateMany(
@@ -45,26 +118,29 @@ router.post('/mark-read', asyncHandler(async (req, res) => {
       {
         $set: {
           isRead: true,
-          'deliveryStatus.inApp': { shown: true, shownAt: new Date() },
+          'deliveryStatus.inApp.shown': true,
+          'deliveryStatus.inApp.shownAt': new Date(),
         },
         $addToSet: { readBy: { userId: req.user.userId, readAt: new Date() } },
       }
     );
     res.json({ success: true, modifiedCount: result.modifiedCount, all: true });
-  } else if (notificationIds && Array.isArray(notificationIds)) {
-    const result = await markAsRead(req.user.userId, notificationIds);
-    res.json({ success: true, modifiedCount: result.modifiedCount });
+  } else if (targetIds && Array.isArray(targetIds) && targetIds.length > 0) {
+    const result = await markAsRead(req.user.userId, targetIds);
+    res.json({ success: true, modifiedCount: result.modifiedCount || 0, count: result.modifiedCount || 0 });
   } else {
-    res.status(400).json({ error: '缺少参数: notificationIds 或 all=true' });
+    res.status(400).json({ error: '缺少参数: ids 或 notificationIds 或 all=true' });
   }
 }));
 
 router.get('/unread-count', asyncHandler(async (req, res) => {
   const count = await Notification.countDocuments({
-    $or: [{ 'recipients.users': req.user.userId }, { priority: { $in: ['HIGH', 'URGENT', 'CRITICAL'] } }],
+    $and: [
+      { $or: [{ 'recipients.users': req.user.userId }, { priority: { $in: ['HIGH', 'URGENT', 'CRITICAL'] } }] },
+      { $or: [{ expiresAt: { $exists: false } }, { expiresAt: { $gt: new Date() } }] },
+    ],
     isRead: false,
     isArchived: false,
-    $or: [{ expiresAt: { $exists: false } }, { expiresAt: { $gt: new Date() } }],
   });
 
   const urgentCount = await Notification.countDocuments({
@@ -84,16 +160,19 @@ router.get('/:notificationId', asyncHandler(async (req, res) => {
   const notification = await Notification.findOne({ notificationId: req.params.notificationId });
   if (!notification) return res.status(404).json({ error: '通知不存在' });
 
+  let changed = false;
   if (!notification.isRead) {
     notification.isRead = true;
     notification.readBy = notification.readBy || [];
     notification.readBy.push({ userId: req.user.userId, readAt: new Date() });
     notification.deliveryStatus = notification.deliveryStatus || {};
     notification.deliveryStatus.inApp = { shown: true, shownAt: new Date() };
-    await notification.save();
+    changed = true;
   }
 
-  res.json(notification);
+  if (changed) await notification.save();
+
+  res.json(formatNotificationForFrontend(notification, req.user.userId));
 }));
 
 router.post('/:notificationId/archive', asyncHandler(async (req, res) => {

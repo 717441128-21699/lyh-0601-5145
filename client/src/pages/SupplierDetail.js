@@ -10,13 +10,13 @@ import ReactECharts from 'echarts-for-react';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const SupplierDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+const SupplierDetail = () => {
+  const { id } = useParams();
   const navigate = useNavigate();
   const hasPermission = useUserStore((s) => s.hasPermission);
   const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
+  const [detail, setDetail] = useState(null);
+  const [history, setHistory] = useState([]);
   const [notFound, setNotFound] = useState(false);
   const [blacklistOpen, setBlacklistOpen] = useState(false);
   const [unblockOpen, setUnblockOpen] = useState(false);
@@ -26,7 +26,7 @@ const SupplierDetail: React.FC = () => {
   const [unblockForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [transTab, setTransTab] = useState('recent');
-  const [recentTrans, setRecentTrans] = useState<any[]>([]);
+  const [recentTrans, setRecentTrans] = useState([]);
 
   const fetchData = async () => {
     if (!id) return;
@@ -38,9 +38,9 @@ const SupplierDetail: React.FC = () => {
         api.transactions.list({ supplierId: id, pageSize: 10, page: 1 }).catch(() => ({ transactions: [] })),
       ]);
       setDetail(d);
-      setHistory((h as any).logs || []);
-      setRecentTrans((t as any).transactions || []);
-    } catch (e: any) {
+      setHistory((h).logs || []);
+      setRecentTrans((t).transactions || []);
+    } catch (e) {
       if (e.response?.status === 404) setNotFound(true);
       else message.error('加载供应商详情失败');
     } finally { setLoading(false); }
@@ -48,10 +48,10 @@ const SupplierDetail: React.FC = () => {
 
   useEffect(() => { fetchData(); }, [id]);
 
-  const doBlacklist = async (values: any) => {
+  const doBlacklist = async (values) => {
     try {
       setActionLoading(true);
-      const payload: any = {
+      const payload = {
         reason: values.reason,
         notes: values.notes,
         rejectPending: values.rejectPending !== false,
@@ -60,29 +60,29 @@ const SupplierDetail: React.FC = () => {
       message.success('已加入黑名单');
       setBlacklistOpen(false); blacklistForm.resetFields();
       setTimeout(fetchData, 800);
-    } catch (e: any) { message.error(e.response?.data?.error || '操作失败'); }
+    } catch (e) { message.error(e.response?.data?.error || '操作失败'); }
     finally { setActionLoading(false); }
   };
 
-  const doUnblock = async (values: any) => {
+  const doUnblock = async (values) => {
     try {
       setActionLoading(true);
       await api.suppliers.unblock(id, values.reason);
       message.success('已解除黑名单');
       setUnblockOpen(false); unblockForm.resetFields();
       setTimeout(fetchData, 800);
-    } catch (e: any) { message.error(e.response?.data?.error || '操作失败'); }
+    } catch (e) { message.error(e.response?.data?.error || '操作失败'); }
     finally { setActionLoading(false); }
   };
 
-  const doEdit = async (values: any) => {
+  const doEdit = async (values) => {
     try {
       setActionLoading(true);
       await api.suppliers.update(id, values);
       message.success('供应商信息已更新');
       setEditOpen(false); editForm.resetFields();
       setTimeout(fetchData, 800);
-    } catch (e: any) { message.error(e.response?.data?.error || '操作失败'); }
+    } catch (e) { message.error(e.response?.data?.error || '操作失败'); }
     finally { setActionLoading(false); }
   };
 
@@ -102,12 +102,12 @@ const SupplierDetail: React.FC = () => {
   const trendOption = detail?.monthlyStats ? {
     tooltip: { trigger: 'axis' },
     grid: { left: 40, right: 20, top: 20, bottom: 30 },
-    xAxis: { type: 'category', data: detail.monthlyStats.map((m: any) => m.month), axisLabel: { fontSize: 10 } },
+    xAxis: { type: 'category', data: detail.monthlyStats.map((m) => m.month), axisLabel: { fontSize: 10 } },
     yAxis: { type: 'value' },
     legend: { data: ['交易笔数', '风险命中'], top: 0 },
     series: [
-      { name: '交易笔数', type: 'bar', data: detail.monthlyStats.map((m: any) => m.count), itemStyle: { color: '#1677ff', borderRadius: [4, 4, 0, 0] } },
-      { name: '风险命中', type: 'line', smooth: true, data: detail.monthlyStats.map((m: any) => m.flagged), itemStyle: { color: '#ff4d4f' }, lineStyle: { width: 3 } },
+      { name: '交易笔数', type: 'bar', data: detail.monthlyStats.map((m) => m.count), itemStyle: { color: '#1677ff', borderRadius: [4, 4, 0, 0] } },
+      { name: '风险命中', type: 'line', smooth: true, data: detail.monthlyStats.map((m) => m.flagged), itemStyle: { color: '#ff4d4f' }, lineStyle: { width: 3 } },
     ],
   } : {};
 
@@ -254,7 +254,7 @@ const SupplierDetail: React.FC = () => {
                     <List
                       size="small"
                       dataSource={detail.beneficialOwners}
-                      renderItem={(p: any, i) => (
+                      renderItem={(p, i) => (
                         <List.Item className="!px-0 !border-0 !border-b !border-gray-100 last:!border-0">
                           <Row align="middle" className="w-full" gutter={[8, 0]}>
                             <Col>
@@ -325,7 +325,7 @@ const SupplierDetail: React.FC = () => {
                 <List
                   size="small"
                   dataSource={recentTrans}
-                  renderItem={(t: any) => (
+                  renderItem={(t) => (
                     <List.Item
                       className="!px-0 !border-0 !border-b !border-gray-100 last:!border-0 cursor-pointer hover:bg-blue-50"
                       onClick={() => navigate(`/transactions/${t._id}`)}
@@ -366,7 +366,7 @@ const SupplierDetail: React.FC = () => {
               {history.length ? (
                 <Timeline
                   mode="left"
-                  items={history.map((h: any) => ({
+                  items={history.map((h) => ({
                     color: h.severity === 'ERROR' ? 'red' : h.severity === 'WARNING' ? 'orange' : 'blue',
                     label: <span className="font-mono text-xs text-gray-500 whitespace-nowrap">{dayjs(h.createdAt).format('YYYY-MM-DD HH:mm')}</span>,
                     children: (

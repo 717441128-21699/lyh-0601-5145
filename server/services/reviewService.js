@@ -13,12 +13,9 @@ const ESCALATION_GROUP = 'COMPLIANCE_DIRECTOR';
 const DEFAULT_GROUP = 'LEGAL_DEPT';
 
 async function createReviewTicket(transaction, riskResult, opts = {}) {
-  const reviewDeadline = moment().add(REVIEW_TIME_LIMIT_HOURS, 'hours').toDate();
   const isUrgent = riskResult.riskLevel === 'CRITICAL' || riskResult.riskScore >= 90;
-
-  if (isUrgent) {
-    reviewDeadline = moment().add(4, 'hours').toDate();
-  }
+  const deadlineHours = isUrgent ? 4 : REVIEW_TIME_LIMIT_HOURS;
+  const reviewDeadline = moment().add(deadlineHours, 'hours').toDate();
 
   const ticket = new ReviewTicket({
     ticketId: 'REV-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase(),

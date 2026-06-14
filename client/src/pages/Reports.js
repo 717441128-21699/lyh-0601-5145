@@ -10,7 +10,7 @@ import {
   ThunderboltOutlined, ClockCircleOutlined, CheckCircleOutlined,
   CloseCircleOutlined, ExclamationCircleOutlined, FileSearchOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+
 import { api } from '../services/api';
 import {
   RISK_COLORS, RISK_LABELS, formatPercent, formatNumber, formatCurrency,
@@ -22,54 +22,33 @@ import dayjs from 'dayjs';
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
-interface ReportRecord {
-  _id: string;
-  reportType: string;
-  period: { start: string; end: string; label: string };
-  summary: {
-    totalTransactions: number;
-    screened: number;
-    flagged: number;
-    hitRate: number;
-    approved: number;
-    rejected: number;
-    pending: number;
-    avgReviewHours: number;
-    slaBreachCount: number;
-  };
-  riskDistribution: Array<{ level: string; count: number; percentage: number }>;
-  sanctionHits: Array<{ listName: string; count: number }>;
-  files: { excel?: string; pdf?: string };
-  generatedBy: { name: string };
-  createdAt: string;
-  status: string;
-}
 
-const Reports: React.FC = () => {
+
+const Reports = () => {
   const hasPermission = useUserStore((s) => s.hasPermission);
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ReportRecord[]>([]);
+  const [data, setData] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [filters, setFilters] = useState<any>({ type: undefined, dateRange: undefined });
+  const [filters, setFilters] = useState({ type: undefined, dateRange: undefined });
   const [generateOpen, setGenerateOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detail, setDetail] = useState<ReportRecord | null>(null);
+  const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [generateForm] = Form.useForm();
-  const [todaySummary, setTodaySummary] = useState<any>(null);
+  const [todaySummary, setTodaySummary] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: any = { page, pageSize };
+      const params = { page, pageSize };
       if (filters.type) params.reportType = filters.type;
       if (filters.dateRange?.length === 2) {
         params.startDate = filters.dateRange[0].startOf('day').toISOString();
         params.endDate = filters.dateRange[1].endOf('day').toISOString();
       }
-      const res: any = await api.reports.list(params);
+      const res = await api.reports.list(params);
       setData(res.reports || []);
       setTotal(res.total || 0);
     } catch (e) {
@@ -81,7 +60,7 @@ const Reports: React.FC = () => {
 
   const fetchToday = async () => {
     try {
-      const res: any = await api.reports.summaryToday();
+      const res = await api.reports.summaryToday();
       setTodaySummary(res);
     } catch (e) { /* ignore */ }
   };
@@ -94,33 +73,33 @@ const Reports: React.FC = () => {
     fetchData();
   };
 
-  const handleGenerate = async (values: any) => {
+  const handleGenerate = async (values) => {
     try {
       setLoading(true);
-      const payload: any = {
+      const payload = {
         reportType: values.reportType,
       };
       if (values.range) {
         payload.startDate = values.range[0].startOf('day').toISOString();
         payload.endDate = values.range[1].endOf('day').toISOString();
       }
-      const res: any = await api.reports.generate(payload);
+      const res = await api.reports.generate(payload);
       message.success('报告生成任务已提交，稍后将出现在列表中');
       setGenerateOpen(false);
       generateForm.resetFields();
       setTimeout(fetchData, 2000);
-    } catch (e: any) {
+    } catch (e) {
       message.error(e.response?.data?.error || '生成失败');
     } finally {
       setLoading(false);
     }
   };
 
-  const openDetail = async (id: string) => {
+  const openDetail = async (id) => {
     setDetailLoading(true);
     setDetailOpen(true);
     try {
-      const res: any = await api.reports.get(id);
+      const res = await api.reports.get(id);
       setDetail(res);
     } catch (e) {
       message.error('加载报告详情失败');
@@ -129,17 +108,17 @@ const Reports: React.FC = () => {
     }
   };
 
-  const regenerateFiles = async (id: string) => {
+  const regenerateFiles = async (id) => {
     try {
       await api.reports.regenerateFiles(id);
       message.success('文件重新生成任务已提交');
       setTimeout(() => openDetail(id), 1500);
-    } catch (e: any) {
+    } catch (e) {
       message.error(e.response?.data?.error || '操作失败');
     }
   };
 
-  const handleDownload = (url: string, filename: string) => {
+  const handleDownload = (url, filename) => {
     const token = localStorage.getItem('token');
     const a = document.createElement('a');
     a.href = `${url}?token=${token}`;
@@ -158,7 +137,7 @@ const Reports: React.FC = () => {
         type: 'pie', radius: ['40%', '70%'], avoidLabelOverlap: false,
         itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
         label: { show: true, formatter: '{b}\n{d}%' },
-        data: detail.riskDistribution.map((r: any) => ({
+        data: detail.riskDistribution.map((r) => ({
           name: RISK_LABELS[r.level] || r.level,
           value: r.count,
           itemStyle: { color: RISK_COLORS[r.level] || '#999' },
@@ -174,20 +153,20 @@ const Reports: React.FC = () => {
       grid: { left: 60, right: 20, top: 20, bottom: 60 },
       xAxis: {
         type: 'category',
-        data: detail.sanctionHits.map((s: any) => s.listName),
+        data: detail.sanctionHits.map((s) => s.listName),
         axisLabel: { rotate: 30, fontSize: 11 },
       },
       yAxis: { type: 'value' },
       series: [{
         type: 'bar', barWidth: '50%',
         itemStyle: { color: '#1677ff', borderRadius: [4, 4, 0, 0] },
-        data: detail.sanctionHits.map((s: any) => s.count),
+        data: detail.sanctionHits.map((s) => s.count),
         label: { show: true, position: 'top' },
       }],
     };
   }, [detail]);
 
-  const columns: ColumnsType<ReportRecord> = [
+  const columns: Array = [
     {
       title: '报告类型', dataIndex: 'reportType', width: 120,
       render: (v) => <Tag color="blue">{v === 'DAILY' ? '日报' : v === 'WEEKLY' ? '周报' : v === 'MONTHLY' ? '月报' : '自定义'}</Tag>,
@@ -335,7 +314,7 @@ const Reports: React.FC = () => {
             <Select
               allowClear style={{ width: '100%' }} placeholder="全部类型"
               value={filters.type}
-              onChange={(v) => setFilters((f: any) => ({ ...f, type: v }))}
+              onChange={(v) => setFilters((f) => ({ ...f, type: v }))}
             >
               <Option value="DAILY">日报</Option>
               <Option value="WEEKLY">周报</Option>
@@ -346,7 +325,7 @@ const Reports: React.FC = () => {
           <Col xs={24} sm={12} md={10}>
             <label className="block text-sm text-gray-600 mb-1">生成时间范围</label>
             <RangePicker style={{ width: '100%' }} value={filters.dateRange}
-              onChange={(v) => setFilters((f: any) => ({ ...f, dateRange: v }))} />
+              onChange={(v) => setFilters((f) => ({ ...f, dateRange: v }))} />
           </Col>
           <Col xs={24} md={8}>
             <label className="block text-sm text-gray-600 mb-1">&nbsp;</label>
@@ -538,7 +517,7 @@ const Reports: React.FC = () => {
                 <List
                   size="small"
                   dataSource={detail.riskDistribution || []}
-                  renderItem={(item: any) => (
+                  renderItem={(item) => (
                     <List.Item className="!px-0">
                       <Row className="w-full" align="middle" gutter={[8, 0]}>
                         <Col span={6}>

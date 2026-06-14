@@ -91,7 +91,62 @@ router.get('/:ticketId', requirePermission('review:view'), asyncHandler(async (r
     .sort({ timestamp: -1 })
     .limit(50);
 
-  res.json({ ticket, auditLogs });
+  const ticketObj = ticket.toObject();
+
+  const assignedToUser = ticket.assignedTo
+    ? await User.findOne({ userId: ticket.assignedTo }).select('userId username fullName role')
+    : null;
+  const reviewedByUser = ticket.reviewedBy
+    ? await User.findOne({ userId: ticket.reviewedBy }).select('userId username fullName role')
+    : null;
+  const createdByUser = ticket.createdBy
+    ? await User.findOne({ userId: ticket.createdBy }).select('userId username fullName role')
+    : null;
+  const escalatedByUser = ticket.escalatedBy
+    ? await User.findOne({ userId: ticket.escalatedBy }).select('userId username fullName role')
+    : null;
+
+  const result = {
+    ...ticketObj,
+    _id: ticket._id,
+    id: ticketId,
+    ticketId,
+    assignedTo: assignedToUser ? {
+      _id: assignedToUser._id,
+      userId: assignedToUser.userId,
+      name: assignedToUser.fullName || assignedToUser.username,
+      username: assignedToUser.username,
+      role: assignedToUser.role,
+    } : null,
+    reviewedBy: reviewedByUser ? {
+      _id: reviewedByUser._id,
+      userId: reviewedByUser.userId,
+      name: reviewedByUser.fullName || reviewedByUser.username,
+      username: reviewedByUser.username,
+      role: reviewedByUser.role,
+    } : null,
+    createdBy: createdByUser ? {
+      name: createdByUser.fullName || createdByUser.username,
+      username: createdByUser.username,
+      role: createdByUser.role,
+    } : null,
+    escalatedBy: escalatedByUser ? {
+      name: escalatedByUser.fullName || escalatedByUser.username,
+    } : null,
+    transaction: ticket.transactionId || null,
+    sanctionMatches: ticket.sanctionMatches || [],
+    riskFactors: [],
+    reviewDurationHours: ticket.reviewDurationHours || 0,
+    reviewDeadline: ticket.reviewDeadline,
+    auditLogs,
+  };
+
+  if (result.transaction) {
+    result.transactionId = result.transaction?._id;
+    result.transactionRefId = result.transaction?.transactionId;
+  }
+
+  res.json(result);
 }));
 
 router.put('/:ticketId/assign', requirePermission('review:assign'), asyncHandler(async (req, res) => {

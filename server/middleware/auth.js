@@ -54,7 +54,11 @@ const ROLE_PERMISSIONS = {
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!token && req.query?.token) {
+    token = req.query.token;
+  }
 
   if (!token) {
     return res.status(401).json({ error: '未提供认证令牌' });
