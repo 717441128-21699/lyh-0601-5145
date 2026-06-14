@@ -95,6 +95,19 @@ const Reports = () => {
     }
   };
 
+  const quickGenerate = async (reportType) => {
+    try {
+      setLoading(true);
+      const res = await api.reports.generate({ reportType });
+      message.success(`${reportType === 'DAILY' ? '日报' : reportType === 'WEEKLY' ? '周报' : '月报'}生成成功`);
+      setTimeout(fetchData, 1500);
+    } catch (e) {
+      message.error(e.response?.data?.error || '生成失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openDetail = async (id) => {
     setDetailLoading(true);
     setDetailOpen(true);
@@ -229,20 +242,20 @@ const Reports = () => {
       render: (_, r) => (
         <Space size="small">
           <Tooltip title="查看详情">
-            <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDetail(r._id)}>详情</Button>
+            <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDetail(r.reportId)}>详情</Button>
           </Tooltip>
           <Tooltip title={r.files?.excel ? '下载Excel' : '未生成'}>
             <Button
               type="link" size="small" icon={<FileExcelOutlined />}
               disabled={!r.files?.excel}
-              onClick={() => handleDownload(api.reports.downloadExcel(r._id), `report_${r._id}.xlsx`)}
+              onClick={() => handleDownload(api.reports.downloadExcel(r.reportId), `report_${r.reportId}.xlsx`)}
             >Excel</Button>
           </Tooltip>
           <Tooltip title={r.files?.pdf ? '下载PDF' : '未生成'}>
             <Button
               type="link" size="small" icon={<FilePdfOutlined />}
               disabled={!r.files?.pdf}
-              onClick={() => handleDownload(api.reports.downloadPdf(r._id), `report_${r._id}.pdf`)}
+              onClick={() => handleDownload(api.reports.downloadPdf(r.reportId), `report_${r.reportId}.pdf`)}
             >PDF</Button>
           </Tooltip>
         </Space>
@@ -303,9 +316,12 @@ const Reports = () => {
 
       <Card className="!rounded-xl shadow-sm" title="筛选条件" extra={
         hasPermission('report:create') && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setGenerateOpen(true)}>
-            生成报告
-          </Button>
+          <Space>
+            <Button type="primary" size="small" onClick={() => quickGenerate('DAILY')}>生成日报</Button>
+            <Button type="primary" size="small" onClick={() => quickGenerate('WEEKLY')}>生成周报</Button>
+            <Button type="primary" size="small" onClick={() => quickGenerate('MONTHLY')}>生成月报</Button>
+            <Button icon={<PlusOutlined />} onClick={() => setGenerateOpen(true)}>更多</Button>
+          </Space>
         )
       }>
         <Row gutter={[16, 16]} align="middle">
@@ -342,7 +358,7 @@ const Reports = () => {
 
       <Card className="!rounded-xl shadow-sm">
         <Table
-          rowKey="_id"
+          rowKey="reportId"
           loading={loading}
           columns={columns}
           dataSource={data}
@@ -417,7 +433,7 @@ const Reports = () => {
               {/* 基础信息 */}
               <Card size="small" className="!rounded-lg">
                 <Descriptions column={2} size="small">
-                  <Descriptions.Item label="报告ID"><code className="text-xs">{detail._id}</code></Descriptions.Item>
+                  <Descriptions.Item label="报告编号"><code className="text-xs">{detail.reportId}</code></Descriptions.Item>
                   <Descriptions.Item label="统计周期">{detail.period?.label}</Descriptions.Item>
                   <Descriptions.Item label="周期范围">
                     {dayjs(detail.period?.start).format('YYYY-MM-DD')} ~ {dayjs(detail.period?.end).format('YYYY-MM-DD')}

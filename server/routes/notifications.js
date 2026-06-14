@@ -73,6 +73,9 @@ router.get('/', asyncHandler(async (req, res) => {
     limit: parseInt(pageSize) || parseInt(limit) || 20,
     skip: ((parseInt(page) || 1) - 1) * (parseInt(pageSize) || parseInt(limit) || 20),
     unreadOnly: unreadOnly === 'true' || unreadOnly === true || read === false,
+    type,
+    priority,
+    minPriority,
   };
 
   const result = await getNotificationsForUser(req.user.userId, opts);
@@ -157,7 +160,16 @@ router.get('/unread-count', asyncHandler(async (req, res) => {
 }));
 
 router.get('/:notificationId', asyncHandler(async (req, res) => {
-  const notification = await Notification.findOne({ notificationId: req.params.notificationId });
+  const { notificationId } = req.params;
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(notificationId);
+  
+  let notification;
+  if (isObjectId) {
+    notification = await Notification.findById(notificationId);
+  } else {
+    notification = await Notification.findOne({ notificationId });
+  }
+  
   if (!notification) return res.status(404).json({ error: '通知不存在' });
 
   let changed = false;
@@ -176,9 +188,16 @@ router.get('/:notificationId', asyncHandler(async (req, res) => {
 }));
 
 router.post('/:notificationId/archive', asyncHandler(async (req, res) => {
+  const { notificationId } = req.params;
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(notificationId);
+  
+  const idFilter = isObjectId
+    ? { _id: notificationId }
+    : { notificationId };
+
   const result = await Notification.updateOne(
     {
-      notificationId: req.params.notificationId,
+      ...idFilter,
       $or: [{ 'recipients.users': req.user.userId }, { priority: { $in: ['HIGH', 'URGENT', 'CRITICAL'] } }],
     },
     { $set: { isArchived: true } }

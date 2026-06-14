@@ -322,6 +322,19 @@ async function buildAuditFilter(query) {
   if (query.relatedTransactionId) filter.relatedTransactionId = query.relatedTransactionId;
   if (query.relatedReviewId) filter.relatedReviewId = query.relatedReviewId;
 
+  if (query.keyword) {
+    const kw = query.keyword;
+    filter.$or = [
+      { description: { $regex: kw, $options: 'i' } },
+      { action: { $regex: kw, $options: 'i' } },
+      { entityId: { $regex: kw, $options: 'i' } },
+      { userName: { $regex: kw, $options: 'i' } },
+      { userId: { $regex: kw, $options: 'i' } },
+      { errorMessage: { $regex: kw, $options: 'i' } },
+      { ipAddress: { $regex: kw, $options: 'i' } },
+    ];
+  }
+
   if (query.startDate) filter.timestamp = { $gte: new Date(query.startDate) };
   if (query.endDate) {
     const endD = new Date(query.endDate);

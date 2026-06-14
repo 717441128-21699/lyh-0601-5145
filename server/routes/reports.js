@@ -78,15 +78,42 @@ router.get('/', requirePermission('report:view'), asyncHandler(async (req, res) 
 }));
 
 router.post('/generate', requirePermission('report:generate'), asyncHandler(async (req, res) => {
-  const { reportType = 'CUSTOM', startDate, endDate } = req.body;
-
-  if (!startDate || !endDate) {
-    throw new BadRequestError('必须提供startDate和endDate');
-  }
+  let { reportType = 'CUSTOM', startDate, endDate } = req.body;
 
   const validTypes = ['DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM', 'ADHOC'];
   if (!validTypes.includes(reportType)) {
     throw new BadRequestError(`无效的报告类型: ${reportType}`);
+  }
+
+  if (!startDate || !endDate) {
+    const now = new Date();
+    if (reportType === 'DAILY') {
+      const d = new Date(now);
+      d.setHours(0, 0, 0, 0);
+      startDate = d.toISOString();
+      const e = new Date(d);
+      e.setHours(23, 59, 59, 999);
+      endDate = e.toISOString();
+    } else if (reportType === 'WEEKLY') {
+      const d = new Date(now);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      d.setDate(diff);
+      d.setHours(0, 0, 0, 0);
+      startDate = d.toISOString();
+      const e = new Date(d);
+      e.setDate(e.getDate() + 6);
+      e.setHours(23, 59, 59, 999);
+      endDate = e.toISOString();
+    } else if (reportType === 'MONTHLY') {
+      const d = new Date(now.getFullYear(), now.getMonth(), 1);
+      startDate = d.toISOString();
+      const e = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      e.setHours(23, 59, 59, 999);
+      endDate = e.toISOString();
+    } else {
+      throw new BadRequestError('自定义报告必须提供 startDate 和 endDate');
+    }
   }
 
   const report = await generateReport({

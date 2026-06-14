@@ -152,12 +152,14 @@ async function processAlertDelivery(notification) {
 }
 
 async function alertHighRiskTransaction(transaction, riskResult, ticket) {
+  const isCritical = riskResult.riskLevel === 'CRITICAL';
+  const deadlineHours = isCritical ? 4 : 24;
   const notification = await createNotification({
     type: 'HIGH_RISK_ALERT',
-    priority: riskResult.riskLevel === 'CRITICAL' ? 'CRITICAL' : 'URGENT',
-    severity: riskResult.riskLevel === 'CRITICAL' ? 'CRITICAL' : 'ERROR',
+    priority: isCritical ? 'CRITICAL' : 'URGENT',
+    severity: isCritical ? 'CRITICAL' : 'ERROR',
     title: `🚨 高风险交易命中: ${transaction.transactionId}`,
-    message: `交易 ${transaction.transactionId} 风险评分 ${riskResult.riskScore}/100 (${riskResult.riskLevel})，${ticket ? `已冻结并生成工单 ${ticket.ticketId}` : '请立即处理'}`,
+    message: `交易 ${transaction.transactionId} 风险评分 ${riskResult.riskScore}/100 (${riskResult.riskLevel})，${ticket ? `已冻结并生成工单 ${ticket.ticketId}，截止时间 ${deadlineHours} 小时` : '请立即处理'}`,
     summary: `${transaction.supplierName} · ${transaction.hsCode} · ${transaction.originCountry} → ${transaction.destinationCountry}`,
     data: {
       transactionId: transaction.transactionId,
@@ -171,6 +173,8 @@ async function alertHighRiskTransaction(transaction, riskResult, ticket) {
       riskScore: riskResult.riskScore,
       riskLevel: riskResult.riskLevel,
       ticketId: ticket?.ticketId || null,
+      reviewDeadline: ticket?.reviewDeadline || null,
+      deadlineHours,
       sanctionListsHit: [...new Set(riskResult.sanctionMatches.map(m => m.listName))].join(', ') || '无',
     },
     recipients: {
@@ -281,17 +285,40 @@ async function alertSupplierBlacklisted(supplier, reason, user) {
 }
 
 async function getNotificationsForUser(userId, opts = {}) {
-  const { limit = 50, skip = 0, unreadOnly = false } = opts;
+  const { limit = 50, skip = 0, unreadOnly = false, type, priority, minPriority } = opts;
 
   const filter = {
-    $or: [
-      { 'recipients.users': userId },
-      { isRead: false, priority: { $in: ['HIGH', 'URGENT', 'CRITICAL'] } },
+    $and: [
+      {
+        $or: [
+          { 'recipients.users': userId },
+          { isRead: false, priority: { $in: ['HIGH', 'URGENT', 'CRITICAL'] } },
+        ],
+      },
+      { isArchived: false },
     ],
-    isArchived: false,
   };
 
-  if (unreadOnly) filter.isRead = false;
+  if (unreadOnly) {
+    filter.$and.push({ isRead: false });
+  }
+
+  if (type) {
+    filter.$and.push({ type });
+  }
+
+  if (priority) {
+    filter.$and.push({ priority });
+  }
+
+  if (minPriority) {
+    const priorityOrder = ['LOW', 'MEDIUM', 'HIGH', 'URGENT', 'CRITICAL'];
+    const minIndex = priorityOrder.indexOf(minPriority);
+    if (minIndex >= 0) {
+      const higherPriorities = priorityOrder.slice(minIndex);
+      filter.$and.push({ priority: { $in: higherPriorities } });
+    }
+  }
 
   const total = await Notification.countDocuments(filter);
   const items = await Notification.find(filter)
@@ -303,11 +330,42 @@ async function getNotificationsForUser(userId, opts = {}) {
 }
 
 async function markAsRead(userId, notificationIds) {
+  const objectIds = [];
+  const businessIds = [];
+  notificationIds.forEach(id => {
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      objectIds.push(id);
+    } else {
+      businessIds.push(id);
+    }
+  });
+
+  const idFilter = {};
+  if (objectIds.length > 0 && businessIds.length > 0) {
+    idFilter.$or = [
+      { _id: { $in: objectIds } },
+      { notificationId: { $in: businessIds } },
+    ];
+  } else if (objectIds.length > 0) {
+    idFilter._id = { $in: objectIds };
+  } else {
+    idFilter.notificationId = { $in: businessIds };
+  }
+
+  const filter = {
+    $and: [
+      idFilter,
+      {
+        $or: [
+          { 'recipients.users': userId },
+          { isRead: false },
+        ],
+      },
+    ],
+  };
+
   const result = await Notification.updateMany(
-    {
-      notificationId: { $in: notificationIds },
-      $or: [{ 'recipients.users': userId }, { isRead: false }],
-    },
+    filter,
     {
       $set: { isRead: true, 'deliveryStatus.inApp.shown': true, 'deliveryStatus.inApp.shownAt': new Date() },
       $addToSet: { readBy: { userId, readAt: new Date() } },

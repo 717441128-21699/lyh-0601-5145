@@ -81,13 +81,23 @@ router.get('/dashboard', requirePermission('review:view'), asyncHandler(async (r
 
 router.get('/:ticketId', requirePermission('review:view'), asyncHandler(async (req, res) => {
   const { ticketId } = req.params;
-  const ticket = await ReviewTicket.findOne({ ticketId })
-    .populate('transactionId')
-    .populate('sanctionMatches.sanctionId');
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(ticketId);
+  
+  let ticket;
+  if (isObjectId) {
+    ticket = await ReviewTicket.findById(ticketId)
+      .populate('transactionId')
+      .populate('sanctionMatches.sanctionId');
+  } else {
+    ticket = await ReviewTicket.findOne({ ticketId })
+      .populate('transactionId')
+      .populate('sanctionMatches.sanctionId');
+  }
+  
   if (!ticket) throw new NotFoundError('工单不存在');
 
   const AuditLog = require('../models/AuditLog');
-  const auditLogs = await AuditLog.find({ relatedReviewId: ticketId })
+  const auditLogs = await AuditLog.find({ relatedReviewId: ticket.ticketId })
     .sort({ timestamp: -1 })
     .limit(50);
 

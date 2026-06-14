@@ -115,7 +115,16 @@ router.get('/categories', requirePermission('audit:view'), asyncHandler(async (r
 }));
 
 router.get('/:logId', requirePermission('audit:view'), asyncHandler(async (req, res) => {
-  const log = await AuditLog.findOne({ logId: req.params.logId });
+  const { logId } = req.params;
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(logId);
+  
+  let log;
+  if (isObjectId) {
+    log = await AuditLog.findById(logId);
+  } else {
+    log = await AuditLog.findOne({ logId });
+  }
+  
   if (!log) return res.status(404).json({ error: '日志不存在' });
   res.json(formatAuditForFrontend(log));
 }));
