@@ -66,6 +66,8 @@ function formatNotificationForFrontend(notif, userId) {
 const router = express.Router();
 router.use(authenticateToken);
 
+// ========== 固定路径路由（必须放在动态参数路由之前！） ==========
+
 router.get('/', asyncHandler(async (req, res) => {
   const { limit = 50, skip = 0, page = 1, pageSize = 20, unreadOnly = false, read, minPriority, type, priority } = req.query;
 
@@ -159,57 +161,6 @@ router.get('/unread-count', asyncHandler(async (req, res) => {
   });
 }));
 
-router.get('/:notificationId', asyncHandler(async (req, res) => {
-  const { notificationId } = req.params;
-  const isObjectId = /^[0-9a-fA-F]{24}$/.test(notificationId);
-  
-  let notification;
-  if (isObjectId) {
-    notification = await Notification.findById(notificationId);
-  } else {
-    notification = await Notification.findOne({ notificationId });
-  }
-  
-  if (!notification) return res.status(404).json({ error: '通知不存在' });
-
-  let changed = false;
-  if (!notification.isRead) {
-    notification.isRead = true;
-    notification.readBy = notification.readBy || [];
-    notification.readBy.push({ userId: req.user.userId, readAt: new Date() });
-    notification.deliveryStatus = notification.deliveryStatus || {};
-    notification.deliveryStatus.inApp = { shown: true, shownAt: new Date() };
-    changed = true;
-  }
-
-  if (changed) await notification.save();
-
-  res.json(formatNotificationForFrontend(notification, req.user.userId));
-}));
-
-router.post('/:notificationId/archive', asyncHandler(async (req, res) => {
-  const { notificationId } = req.params;
-  const isObjectId = /^[0-9a-fA-F]{24}$/.test(notificationId);
-  
-  const idFilter = isObjectId
-    ? { _id: notificationId }
-    : { notificationId };
-
-  const result = await Notification.updateOne(
-    {
-      ...idFilter,
-      $or: [{ 'recipients.users': req.user.userId }, { priority: { $in: ['HIGH', 'URGENT', 'CRITICAL'] } }],
-    },
-    { $set: { isArchived: true } }
-  );
-
-  if (result.matchedCount === 0) {
-    return res.status(404).json({ error: '通知不存在或无权限' });
-  }
-
-  res.json({ success: true });
-}));
-
 router.post('/test-webhook', asyncHandler(async (req, res) => {
   const notif = {
     type: 'SYSTEM_ALERT',
@@ -239,5 +190,58 @@ router.get('/types/config', (req, res) => {
     { value: 'SYSTEM_ALERT', label: '系统通知', priority: 'MEDIUM' },
   ]);
 });
+
+// ========== 动态参数路由（必须放在最后！） ==========
+
+router.get('/:notificationId', asyncHandler(async (req, res) => {
+  const { notificationId } = req.params;
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(notificationId);
+
+  let notification;
+  if (isObjectId) {
+    notification = await Notification.findById(notificationId);
+  } else {
+    notification = await Notification.findOne({ notificationId });
+  }
+
+  if (!notification) return res.status(404).json({ error: '通知不存在' });
+
+  let changed = false;
+  if (!notification.isRead) {
+    notification.isRead = true;
+    notification.readBy = notification.readBy || [];
+    notification.readBy.push({ userId: req.user.userId, readAt: new Date() });
+    notification.deliveryStatus = notification.deliveryStatus || {};
+    notification.deliveryStatus.inApp = { shown: true, shownAt: new Date() };
+    changed = true;
+  }
+
+  if (changed) await notification.save();
+
+  res.json(formatNotificationForFrontend(notification, req.user.userId));
+}));
+
+router.post('/:notificationId/archive', asyncHandler(async (req, res) => {
+  const { notificationId } = req.params;
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(notificationId);
+
+  const idFilter = isObjectId
+    ? { _id: notificationId }
+    : { notificationId };
+
+  const result = await Notification.updateOne(
+    {
+      ...idFilter,
+      $or: [{ 'recipients.users': req.user.userId }, { priority: { $in: ['HIGH', 'URGENT', 'CRITICAL'] } }],
+    },
+    { $set: { isArchived: true } }
+  );
+
+  if (result.matchedCount === 0) {
+    return res.status(404).json({ error: '通知不存在或无权限' });
+  }
+
+  res.json({ success: true });
+}));
 
 module.exports = router;

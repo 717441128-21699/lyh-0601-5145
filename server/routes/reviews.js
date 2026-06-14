@@ -21,6 +21,8 @@ const { searchReviews } = require('../services/searchExportService');
 const router = express.Router();
 router.use(authenticateToken);
 
+// ========== 固定路径路由（必须放在动态参数路由之前！） ==========
+
 router.get('/', requirePermission('review:view'), asyncHandler(async (req, res) => {
   const result = await searchReviews(req.query);
   res.json(result);
@@ -79,10 +81,80 @@ router.get('/dashboard', requirePermission('review:view'), asyncHandler(async (r
   });
 }));
 
+router.post('/check-overdue', requirePermission('review:view'), asyncHandler(async (req, res) => {
+  if (req.user.role !== 'COMPLIANCE_DIRECTOR' && req.user.role !== 'ADMIN') {
+    throw new ForbiddenError('仅合规总监或管理员可执行此操作');
+  }
+  const result = await checkAndEscalateOverdue();
+  res.json({ success: true, ...result });
+}));
+
+router.get('/stats/performance', requirePermission('review:view'), asyncHandler(async (req, res) => {
+  const { startDate, endDate, userId } = req.query;
+  const filter = {};
+  if (startDate) filter.reviewedAt = { $gte: new Date(startDate) };
+  if (endDate) {
+    const d = new Date(endDate);
+    d.setHours(23, 59, 59, 999);
+    filter.reviewedAt = { ...filter.reviewedAt, $lte: d };
+  }
+  if (userId) filter.reviewedBy = userId;
+  filter.status = { $in: ['APPROVED', 'REJECTED'] };
+
+  const result = await ReviewTicket.aggregate([
+    { $match: filter },
+    {
+      $group: {
+        _id: '$reviewedBy',
+        total: { $sum: 1 },
+        approved: { $sum: { $cond: [{ $eq: ['$status', 'APPROVED'] }, 1, 0] } },
+        rejected: { $sum: { $cond: [{ $eq: ['$status', 'REJECTED'] }, 1, 0] } },
+        avgHours: { $avg: '$reviewDurationHours' },
+        maxHours: { $max: '$reviewDurationHours' },
+        slaBreach: { $sum: { $cond: ['$slaBreached', 1, 0] } },
+        overdue: { $sum: { $cond: ['$isOverdue', 1, 0] } },
+      }
+    },
+    { $sort: { total: -1 } },
+  ]);
+
+  res.json(result);
+}));
+
+router.get('/stats/workload', requirePermission('review:view'), asyncHandler(async (req, res) => {
+  const reviewers = await User.find(
+    { isActive: true, role: { $in: ['LEGAL_REVIEWER', 'COMPLIANCE_OFFICER', 'COMPLIANCE_DIRECTOR'] } },
+    { userId: 1, fullName: 1, username: 1, role: 1, assignedTicketCount: 1, completedTicketCount: 1 }
+  ).lean();
+
+  const workload = [];
+  for (const reviewer of reviewers) {
+    const pending = await ReviewTicket.countDocuments({
+      assignedTo: reviewer.userId,
+      status: { $in: ['ASSIGNED', 'IN_PROGRESS', 'ESCALATED'] },
+    });
+    const overdue = await ReviewTicket.countDocuments({
+      assignedTo: reviewer.userId,
+      status: { $in: ['ASSIGNED', 'IN_PROGRESS', 'ESCALATED'] },
+      isOverdue: true,
+    });
+
+    workload.push({
+      ...reviewer,
+      pendingCount: pending,
+      overdueCount: overdue,
+    });
+  }
+
+  res.json(workload);
+}));
+
+// ========== 动态参数路由（必须放在最后！） ==========
+
 router.get('/:ticketId', requirePermission('review:view'), asyncHandler(async (req, res) => {
   const { ticketId } = req.params;
   const isObjectId = /^[0-9a-fA-F]{24}$/.test(ticketId);
-  
+
   let ticket;
   if (isObjectId) {
     ticket = await ReviewTicket.findById(ticketId)
@@ -93,7 +165,7 @@ router.get('/:ticketId', requirePermission('review:view'), asyncHandler(async (r
       .populate('transactionId')
       .populate('sanctionMatches.sanctionId');
   }
-  
+
   if (!ticket) throw new NotFoundError('工单不存在');
 
   const AuditLog = require('../models/AuditLog');
@@ -231,74 +303,6 @@ router.post('/:ticketId/escalate', requirePermission('review:escalate'), asyncHa
 
   const ticket = await escalateTicket(ticketId, { reason });
   res.json({ success: true, ticket });
-}));
-
-router.post('/check-overdue', requirePermission('review:view'), asyncHandler(async (req, res) => {
-  if (req.user.role !== 'COMPLIANCE_DIRECTOR' && req.user.role !== 'ADMIN') {
-    throw new ForbiddenError('仅合规总监或管理员可执行此操作');
-  }
-  const result = await checkAndEscalateOverdue();
-  res.json({ success: true, ...result });
-}));
-
-router.get('/stats/performance', requirePermission('review:view'), asyncHandler(async (req, res) => {
-  const { startDate, endDate, userId } = req.query;
-  const filter = {};
-  if (startDate) filter.reviewedAt = { $gte: new Date(startDate) };
-  if (endDate) {
-    const d = new Date(endDate);
-    d.setHours(23, 59, 59, 999);
-    filter.reviewedAt = { ...filter.reviewedAt, $lte: d };
-  }
-  if (userId) filter.reviewedBy = userId;
-  filter.status = { $in: ['APPROVED', 'REJECTED'] };
-
-  const result = await ReviewTicket.aggregate([
-    { $match: filter },
-    {
-      $group: {
-        _id: '$reviewedBy',
-        total: { $sum: 1 },
-        approved: { $sum: { $cond: [{ $eq: ['$status', 'APPROVED'] }, 1, 0] } },
-        rejected: { $sum: { $cond: [{ $eq: ['$status', 'REJECTED'] }, 1, 0] } },
-        avgHours: { $avg: '$reviewDurationHours' },
-        maxHours: { $max: '$reviewDurationHours' },
-        slaBreach: { $sum: { $cond: ['$slaBreached', 1, 0] } },
-        overdue: { $sum: { $cond: ['$isOverdue', 1, 0] } },
-      }
-    },
-    { $sort: { total: -1 } },
-  ]);
-
-  res.json(result);
-}));
-
-router.get('/stats/workload', requirePermission('review:view'), asyncHandler(async (req, res) => {
-  const reviewers = await User.find(
-    { isActive: true, role: { $in: ['LEGAL_REVIEWER', 'COMPLIANCE_OFFICER', 'COMPLIANCE_DIRECTOR'] } },
-    { userId: 1, fullName: 1, username: 1, role: 1, assignedTicketCount: 1, completedTicketCount: 1 }
-  ).lean();
-
-  const workload = [];
-  for (const reviewer of reviewers) {
-    const pending = await ReviewTicket.countDocuments({
-      assignedTo: reviewer.userId,
-      status: { $in: ['ASSIGNED', 'IN_PROGRESS', 'ESCALATED'] },
-    });
-    const overdue = await ReviewTicket.countDocuments({
-      assignedTo: reviewer.userId,
-      status: { $in: ['ASSIGNED', 'IN_PROGRESS', 'ESCALATED'] },
-      isOverdue: true,
-    });
-
-    workload.push({
-      ...reviewer,
-      pendingCount: pending,
-      overdueCount: overdue,
-    });
-  }
-
-  res.json(workload);
 }));
 
 module.exports = router;

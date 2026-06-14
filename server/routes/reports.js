@@ -66,6 +66,18 @@ function formatReportForFrontend(report) {
   };
 }
 
+async function findReportById(id) {
+  let report = await ComplianceReport.findOne({ reportId: id });
+  if (!report) {
+    try {
+      report = await ComplianceReport.findById(id);
+    } catch { /* invalid ObjectId */ }
+  }
+  return report;
+}
+
+// ========== 固定路径路由（必须放在动态参数路由之前！） ==========
+
 router.get('/', requirePermission('report:view'), asyncHandler(async (req, res) => {
   const result = await listReports(req.query);
   const reports = (result.items || []).map(formatReportForFrontend);
@@ -74,6 +86,38 @@ router.get('/', requirePermission('report:view'), asyncHandler(async (req, res) 
     total: result.total,
     page: result.page,
     pageSize: result.pageSize,
+  });
+}));
+
+router.get('/summary/today', requirePermission('report:view'), asyncHandler(async (req, res) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const endDate = new Date(today);
+  endDate.setHours(23, 59, 59, 999);
+
+  const report = await generateReport({
+    reportType: 'ADHOC',
+    startDate: today.toISOString(),
+    endDate: endDate.toISOString(),
+    generatedBy: 'api_dashboard',
+  });
+
+  res.json({
+    reportId: report.reportId,
+    generatedAt: report.generatedAt,
+    totalTransactions: report.summary?.totalTransactions || 0,
+    flagged: report.summary?.uniqueSanctionHits || report.summary?.totalSanctionHits || 0,
+    hitRate: report.summary?.hitRate || 0,
+    approved: report.summary?.approvedTransactions || 0,
+    rejected: report.summary?.rejectedTransactions || 0,
+    avgReviewHours: report.summary?.averageReviewHours || 0,
+    summary: report.summary || {},
+    riskDistribution: report.riskDistribution || [],
+    sanctionHits: (report.sanctionListBreakdown || []).map(s => ({
+      listName: s.listName,
+      count: s.hitCount || s.count || 0,
+    })),
+    sanctionListBreakdown: report.sanctionListBreakdown || [],
   });
 }));
 
@@ -181,15 +225,7 @@ router.get('/daily/generate', requirePermission('report:generate'), asyncHandler
   res.json({ success: true, report });
 }));
 
-async function findReportById(id) {
-  let report = await ComplianceReport.findOne({ reportId: id });
-  if (!report) {
-    try {
-      report = await ComplianceReport.findById(id);
-    } catch { /* invalid ObjectId */ }
-  }
-  return report;
-}
+// ========== 动态参数路由（必须放在最后！） ==========
 
 router.get('/:reportId', requirePermission('report:view'), asyncHandler(async (req, res) => {
   const { reportId } = req.params;
@@ -260,38 +296,6 @@ router.get('/:reportId/download/pdf', requirePermission('report:export'), asyncH
 
   const fileName = `compliance_report_${report.reportType}_${report.reportId}.pdf`;
   res.download(path.resolve(filePath), fileName);
-}));
-
-router.get('/summary/today', requirePermission('report:view'), asyncHandler(async (req, res) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endDate = new Date(today);
-  endDate.setHours(23, 59, 59, 999);
-
-  const report = await generateReport({
-    reportType: 'ADHOC',
-    startDate: today.toISOString(),
-    endDate: endDate.toISOString(),
-    generatedBy: 'api_dashboard',
-  });
-
-  res.json({
-    reportId: report.reportId,
-    generatedAt: report.generatedAt,
-    totalTransactions: report.summary?.totalTransactions || 0,
-    flagged: report.summary?.uniqueSanctionHits || report.summary?.totalSanctionHits || 0,
-    hitRate: report.summary?.hitRate || 0,
-    approved: report.summary?.approvedTransactions || 0,
-    rejected: report.summary?.rejectedTransactions || 0,
-    avgReviewHours: report.summary?.averageReviewHours || 0,
-    summary: report.summary || {},
-    riskDistribution: report.riskDistribution || [],
-    sanctionHits: (report.sanctionListBreakdown || []).map(s => ({
-      listName: s.listName,
-      count: s.hitCount || s.count || 0,
-    })),
-    sanctionListBreakdown: report.sanctionListBreakdown || [],
-  });
 }));
 
 router.post('/:reportId/regenerate-files', requirePermission('report:generate'), asyncHandler(async (req, res) => {
